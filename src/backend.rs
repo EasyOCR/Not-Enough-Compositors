@@ -14,6 +14,11 @@ pub enum Backend {
     /// exact window positioning/sizing on Wayland at all — the standard
     /// protocols this crate otherwise speaks don't allow it.
     Hyprland,
+    /// niri specifically, detected via `NIRI_SOCKET`. Like Hyprland, niri
+    /// is a Wayland compositor with its own JSON IPC (`niri msg`), used
+    /// here instead of standard protocols for the same reason: it can do
+    /// things (exact floating-window position/size) those can't.
+    Niri,
     /// Any other Wayland compositor (Sway, Wayfire, river, dwl, KDE,
     /// GNOME, ...), reached through standard extension protocols.
     Wayland,
@@ -23,13 +28,16 @@ pub enum Backend {
 impl Backend {
     /// Detect the backend from the standard environment variables.
     ///
-    /// `HYPRLAND_INSTANCE_SIGNATURE` takes precedence over plain
-    /// `WAYLAND_DISPLAY` (Hyprland sets both), and `WAYLAND_DISPLAY` takes
+    /// Compositor-specific IPC signals (`HYPRLAND_INSTANCE_SIGNATURE`,
+    /// `NIRI_SOCKET`) take precedence over plain `WAYLAND_DISPLAY`, since
+    /// those compositors set both; `WAYLAND_DISPLAY` in turn takes
     /// precedence over `DISPLAY`, matching how most toolkits choose a
     /// backend when several are present (e.g. an XWayland session).
     pub fn detect() -> Option<Self> {
         if env::var_os("HYPRLAND_INSTANCE_SIGNATURE").is_some() {
             Some(Backend::Hyprland)
+        } else if env::var_os("NIRI_SOCKET").is_some() {
+            Some(Backend::Niri)
         } else if env::var_os("WAYLAND_DISPLAY").is_some() {
             Some(Backend::Wayland)
         } else if env::var_os("DISPLAY").is_some() {

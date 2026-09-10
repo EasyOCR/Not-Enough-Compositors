@@ -28,7 +28,7 @@
 //! used where). Calls that aren't possible on the active backend return
 //! [`Error::Unsupported`] rather than silently doing nothing, so calling
 //! code can detect and handle the gap instead of assuming success.
-//! Hyprland is the one exception: its own `hyprctl` IPC allows exact
+//! Hyprland and niri are the two exceptions: their own IPCs allow exact
 //! move/resize where nothing else on Wayland can.
 
 mod backend;
@@ -37,6 +37,8 @@ mod window;
 
 #[cfg(feature = "hyprland")]
 mod hyprland;
+#[cfg(feature = "niri")]
+mod niri;
 #[cfg(feature = "wayland")]
 mod wayland;
 #[cfg(feature = "x11")]
@@ -88,6 +90,7 @@ pub trait Compositor {
 pub fn connect() -> Result<Box<dyn Compositor>> {
     match Backend::detect().ok_or(Error::NoDisplay)? {
         Backend::Hyprland => connect_hyprland(),
+        Backend::Niri => connect_niri(),
 
         #[cfg(feature = "wayland")]
         Backend::Wayland => Ok(Box::new(wayland::WaylandCompositor::connect()?)),
@@ -134,6 +137,41 @@ fn connect_hyprland() -> Result<Box<dyn Compositor>> {
         #[cfg(not(feature = "wayland"))]
         {
             return Err(Error::BackendDisabled(Backend::Hyprland));
+        }
+    }
+}
+
+/// niri also implements enough standard Wayland extension surface to be
+/// worth falling back to, for the same reason as Hyprland above.
+#[allow(clippy::needless_return)]
+fn connect_niri() -> Result<Box<dyn Compositor>> {
+    #[cfg(feature = "niri")]
+    {
+        match niri::NiriCompositor::connect() {
+            Ok(compositor) => return Ok(Box::new(compositor)),
+            #[allow(unused_variables)]
+            Err(niri_err) => {
+                #[cfg(feature = "wayland")]
+                {
+                    return Ok(Box::new(wayland::WaylandCompositor::connect()?));
+                }
+                #[cfg(not(feature = "wayland"))]
+                {
+                    return Err(niri_err);
+                }
+            }
+        }
+    }
+
+    #[cfg(not(feature = "niri"))]
+    {
+        #[cfg(feature = "wayland")]
+        {
+            return Ok(Box::new(wayland::WaylandCompositor::connect()?));
+        }
+        #[cfg(not(feature = "wayland"))]
+        {
+            return Err(Error::BackendDisabled(Backend::Niri));
         }
     }
 }

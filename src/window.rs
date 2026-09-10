@@ -14,6 +14,10 @@ pub(crate) enum Backing {
     /// `hyprctl clients -j` and reused verbatim in dispatch commands.
     #[cfg(feature = "hyprland")]
     Hyprland(String),
+    /// A niri window id, as reported by `Request::Windows` and reused
+    /// verbatim in `Action` requests.
+    #[cfg(feature = "niri")]
+    Niri(u64),
 }
 
 /// A window's on-screen position and size, in the compositor's own

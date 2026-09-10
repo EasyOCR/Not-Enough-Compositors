@@ -10,6 +10,7 @@ description = "One API for window control across compositors (X11, Hyprland, wlr
 name = "nec"
 
 [features]
+# NOTE: "niri" is intentionally NOT in default — see its entry below.
 default = ["x11", "wayland", "hyprland"]
 x11 = ["dep:x11rb"]
 wayland = [
@@ -21,6 +22,13 @@ wayland = [
 # Hyprland's own hyprctl socket IPC — not a Wayland protocol, so it has no
 # dependency on the "wayland" feature above and works even without it.
 hyprland = ["dep:serde", "dep:serde_json"]
+# niri's own JSON IPC, via niri's official niri-ipc crate. Opt-in, not part
+# of default: niri-ipc is GPL-3.0-or-later, unlike everything else this
+# crate depends on (MIT/Apache-2.0), and pulling in a GPL dependency by
+# default without the consuming project asking for it isn't something this
+# crate should decide on your behalf. Enable it explicitly if that's fine
+# for your project.
+niri = ["dep:niri-ipc"]
 
 [dependencies]
 thiserror = "1"
@@ -38,3 +46,6 @@ wayland-protocols-plasma = { version = "0.3", features = ["client"], optional = 
 # hyprctl's -j output is JSON.
 serde = { version = "1", features = ["derive"], optional = true }
 serde_json = { version = "1", optional = true }
+# niri's official IPC types + a blocking Unix-socket client. GPL-3.0-or-later
+# — see the "niri" feature comment above.
+niri-ipc = { version = "26", optional = true }
