@@ -2,8 +2,8 @@
 //! compositor backend is detected, then (on X11 only, since Wayland can't)
 //! nudges the first one to prove move/resize round-trip through EWMH.
 
-fn main() -> Result<(), easycompositing::Error> {
-    let mut compositor = easycompositing::connect()?;
+fn main() -> Result<(), not_enough_compositors::Error> {
+    let mut compositor = not_enough_compositors::connect()?;
     println!("backend: {:?}", compositor.backend());
 
     let windows = compositor.list_windows()?;

@@ -1,14 +1,14 @@
-# EasyCompositing
+# Not Enough Compositors
 
 One API for window control that works the same across X11, Hyprland, and
-the other major Wayland compositors. EasyCompositing is not a
+the other major Wayland compositors. Not Enough Compositors is not a
 Windows/Linux compatibility layer — it exists so a developer who wants to
 list, focus, close, move, or resize windows across compositor boundaries
 writes that logic **once**, instead of maintaining a separate integration
 per compositor.
 
 ```rust
-let mut compositor = easycompositing::connect()?;
+let mut compositor = not_enough_compositors::connect()?;
 for window in compositor.list_windows()? {
     println!("{}: {}", window.app_id, window.title);
 }

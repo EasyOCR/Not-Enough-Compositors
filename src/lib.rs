@@ -1,4 +1,4 @@
-//! EasyCompositing: one API for controlling windows across compositors.
+//! Not Enough Compositors: one API for controlling windows across compositors.
 //!
 //! The problem this solves: an app that needs to list, focus, move, or
 //! close *another* app's window has to talk to the compositor, and every
@@ -9,8 +9,8 @@
 //! a [`Compositor`], and write your logic once.
 //!
 //! ```no_run
-//! fn main() -> Result<(), easycompositing::Error> {
-//!     let mut compositor = easycompositing::connect()?;
+//! fn main() -> Result<(), not_enough_compositors::Error> {
+//!     let mut compositor = not_enough_compositors::connect()?;
 //!     for window in compositor.list_windows()? {
 //!         println!("{}: {}", window.app_id, window.title);
 //!     }

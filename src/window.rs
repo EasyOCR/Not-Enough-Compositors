@@ -27,8 +27,8 @@ pub struct Geometry {
     pub height: u32,
 }
 
-/// Everything EasyCompositing knows about one window, gathered through
-/// whichever backend is active.
+/// Everything Not Enough Compositors knows about one window, gathered
+/// through whichever backend is active.
 #[derive(Debug, Clone)]
 pub struct WindowInfo {
     pub id: WindowId,

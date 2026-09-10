@@ -1,10 +1,10 @@
 [package]
-name = "easycompositing"
+name = "not-enough-compositors"
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
-repository = "https://github.com/easyocr/easycompositing"
-description = "One API for window control across compositors (X11, wlroots-based Wayland) — write it once, not once per compositor"
+repository = "https://github.com/easyocr/not-enough-compositors"
+description = "One API for window control across compositors (X11, Hyprland, wlroots-based Wayland) — write it once, not once per compositor"
 
 [features]
 default = ["x11", "wayland", "hyprland"]
