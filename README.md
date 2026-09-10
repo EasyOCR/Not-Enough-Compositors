@@ -112,3 +112,12 @@ cargo run --example list_windows               # try it against your session
   on them.
 - **COSMIC**: not tested at all; expected to work via the wlr path based
   on its published protocol support, unconfirmed.
+
+## License
+
+MIT (see [`LICENSE`](LICENSE)) — free to use, modify, and redistribute,
+including commercially, as long as the copyright notice and license text
+are kept with any copy. The optional `niri` feature is the one exception:
+enabling it pulls in `niri-ipc`, which is GPL-3.0-or-later — see that
+feature's note above before turning it on in a project with different
+licensing needs.
