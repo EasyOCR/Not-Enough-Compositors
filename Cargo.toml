@@ -7,7 +7,7 @@ repository = "https://github.com/easyocr/easycompositing"
 description = "One API for window control across compositors (X11, wlroots-based Wayland) — write it once, not once per compositor"
 
 [features]
-default = ["x11", "wayland"]
+default = ["x11", "wayland", "hyprland"]
 x11 = ["dep:x11rb"]
 wayland = [
     "dep:wayland-client",
@@ -15,12 +15,16 @@ wayland = [
     "dep:wayland-protocols",
     "dep:wayland-protocols-plasma",
 ]
+# Hyprland's own hyprctl socket IPC — not a Wayland protocol, so it has no
+# dependency on the "wayland" feature above and works even without it.
+hyprland = ["dep:serde", "dep:serde_json"]
 
 [dependencies]
 thiserror = "1"
 x11rb = { version = "0.14", optional = true }
 wayland-client = { version = "0.31", optional = true }
-# wlr-foreign-toplevel-management: wlroots-based compositors (Sway and similar).
+# wlr-foreign-toplevel-management: wlroots-based compositors (Sway, Wayfire,
+# river, dwl, Hyprland, and similar all implement this the same way).
 wayland-protocols-wlr = { version = "0.3", features = ["client"], optional = true }
 # ext-foreign-toplevel-list-v1: the newer standardized, list-only protocol
 # some non-wlroots compositors (recent Mutter/KWin) implement.
@@ -28,3 +32,6 @@ wayland-protocols = { version = "0.32", features = ["client", "staging"], option
 # org_kde_plasma_window_management: KWin's own protocol, gives full
 # list/focus/close on KDE Plasma when nothing else has already bound it.
 wayland-protocols-plasma = { version = "0.3", features = ["client"], optional = true }
+# hyprctl's -j output is JSON.
+serde = { version = "1", features = ["derive"], optional = true }
+serde_json = { version = "1", optional = true }

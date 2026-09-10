@@ -10,6 +10,10 @@ pub(crate) enum Backing {
     X11(u32),
     #[cfg(feature = "wayland")]
     Wayland(crate::wayland::WaylandBacking),
+    /// A Hyprland client "address" (e.g. `0x5578...`), as reported by
+    /// `hyprctl clients -j` and reused verbatim in dispatch commands.
+    #[cfg(feature = "hyprland")]
+    Hyprland(String),
 }
 
 /// A window's on-screen position and size, in the compositor's own

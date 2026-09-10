@@ -22,16 +22,21 @@
 //!
 //! Wayland's security model deliberately does not let one app reposition
 //! or resize another's window, and window listing/focus/close only work
-//! at all on compositors implementing the wlroots `foreign-toplevel`
-//! extensions (Sway and similar — not GNOME or KDE, which expose no
-//! equivalent protocol). Calls that aren't possible on the active backend
-//! return [`Error::Unsupported`] rather than silently doing nothing, so
-//! calling code can detect and handle the gap instead of assuming success.
+//! at all on compositors implementing an extension protocol for it
+//! (`org_kde_plasma_window_management`, `wlr-foreign-toplevel-management`,
+//! or `ext-foreign-toplevel-list-v1` — see the crate source for which is
+//! used where). Calls that aren't possible on the active backend return
+//! [`Error::Unsupported`] rather than silently doing nothing, so calling
+//! code can detect and handle the gap instead of assuming success.
+//! Hyprland is the one exception: its own `hyprctl` IPC allows exact
+//! move/resize where nothing else on Wayland can.
 
 mod backend;
 mod error;
 mod window;
 
+#[cfg(feature = "hyprland")]
+mod hyprland;
 #[cfg(feature = "wayland")]
 mod wayland;
 #[cfg(feature = "x11")]
@@ -82,6 +87,8 @@ pub trait Compositor {
 /// [`Error::Unsupported`] for operations a given backend can't do.
 pub fn connect() -> Result<Box<dyn Compositor>> {
     match Backend::detect().ok_or(Error::NoDisplay)? {
+        Backend::Hyprland => connect_hyprland(),
+
         #[cfg(feature = "wayland")]
         Backend::Wayland => Ok(Box::new(wayland::WaylandCompositor::connect()?)),
         #[cfg(not(feature = "wayland"))]
@@ -91,5 +98,42 @@ pub fn connect() -> Result<Box<dyn Compositor>> {
         Backend::X11 => Ok(Box::new(x11::X11Compositor::connect()?)),
         #[cfg(not(feature = "x11"))]
         Backend::X11 => Err(Error::BackendDisabled(Backend::X11)),
+    }
+}
+
+/// Hyprland also implements `wlr-foreign-toplevel-management`, so if its
+/// dedicated IPC backend is disabled or fails to reach the socket, fall
+/// back to the generic Wayland backend rather than failing outright —
+/// callers lose exact move/resize but keep list/focus/close.
+#[allow(clippy::needless_return)]
+fn connect_hyprland() -> Result<Box<dyn Compositor>> {
+    #[cfg(feature = "hyprland")]
+    {
+        match hyprland::HyprlandCompositor::connect() {
+            Ok(compositor) => return Ok(Box::new(compositor)),
+            #[allow(unused_variables)]
+            Err(hyprland_err) => {
+                #[cfg(feature = "wayland")]
+                {
+                    return Ok(Box::new(wayland::WaylandCompositor::connect()?));
+                }
+                #[cfg(not(feature = "wayland"))]
+                {
+                    return Err(hyprland_err);
+                }
+            }
+        }
+    }
+
+    #[cfg(not(feature = "hyprland"))]
+    {
+        #[cfg(feature = "wayland")]
+        {
+            return Ok(Box::new(wayland::WaylandCompositor::connect()?));
+        }
+        #[cfg(not(feature = "wayland"))]
+        {
+            return Err(Error::BackendDisabled(Backend::Hyprland));
+        }
     }
 }
