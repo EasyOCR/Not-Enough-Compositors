@@ -6,6 +6,9 @@ license = "MIT"
 repository = "https://github.com/easyocr/not-enough-compositors"
 description = "One API for window control across compositors (X11, Hyprland, wlroots-based Wayland) — write it once, not once per compositor"
 
+[lib]
+name = "nec"
+
 [features]
 default = ["x11", "wayland", "hyprland"]
 x11 = ["dep:x11rb"]

@@ -8,7 +8,7 @@ writes that logic **once**, instead of maintaining a separate integration
 per compositor.
 
 ```rust
-let mut compositor = not_enough_compositors::connect()?;
+let mut compositor = nec::connect()?;
 for window in compositor.list_windows()? {
     println!("{}: {}", window.app_id, window.title);
 }

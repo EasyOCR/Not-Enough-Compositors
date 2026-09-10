@@ -9,8 +9,8 @@
 //! a [`Compositor`], and write your logic once.
 //!
 //! ```no_run
-//! fn main() -> Result<(), not_enough_compositors::Error> {
-//!     let mut compositor = not_enough_compositors::connect()?;
+//! fn main() -> Result<(), nec::Error> {
+//!     let mut compositor = nec::connect()?;
 //!     for window in compositor.list_windows()? {
 //!         println!("{}: {}", window.app_id, window.title);
 //!     }
