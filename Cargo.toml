@@ -9,10 +9,22 @@ description = "One API for window control across compositors (X11, wlroots-based
 [features]
 default = ["x11", "wayland"]
 x11 = ["dep:x11rb"]
-wayland = ["dep:wayland-client", "dep:wayland-protocols-wlr"]
+wayland = [
+    "dep:wayland-client",
+    "dep:wayland-protocols-wlr",
+    "dep:wayland-protocols",
+    "dep:wayland-protocols-plasma",
+]
 
 [dependencies]
 thiserror = "1"
 x11rb = { version = "0.14", optional = true }
 wayland-client = { version = "0.31", optional = true }
+# wlr-foreign-toplevel-management: wlroots-based compositors (Sway and similar).
 wayland-protocols-wlr = { version = "0.3", features = ["client"], optional = true }
+# ext-foreign-toplevel-list-v1: the newer standardized, list-only protocol
+# some non-wlroots compositors (recent Mutter/KWin) implement.
+wayland-protocols = { version = "0.32", features = ["client", "staging"], optional = true }
+# org_kde_plasma_window_management: KWin's own protocol, gives full
+# list/focus/close on KDE Plasma when nothing else has already bound it.
+wayland-protocols-plasma = { version = "0.3", features = ["client"], optional = true }

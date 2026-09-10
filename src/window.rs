@@ -9,7 +9,7 @@ pub(crate) enum Backing {
     #[cfg(feature = "x11")]
     X11(u32),
     #[cfg(feature = "wayland")]
-    Wayland(wayland_client::backend::ObjectId),
+    Wayland(crate::wayland::WaylandBacking),
 }
 
 /// A window's on-screen position and size, in the compositor's own
