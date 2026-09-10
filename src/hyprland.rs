@@ -38,12 +38,16 @@ pub struct HyprlandCompositor {
 
 impl HyprlandCompositor {
     pub(crate) fn connect() -> Result<Self> {
-        let signature = env::var("HYPRLAND_INSTANCE_SIGNATURE")
-            .map_err(|_| Error::ConnectionFailed("HYPRLAND_INSTANCE_SIGNATURE is not set".into()))?;
+        let signature = env::var("HYPRLAND_INSTANCE_SIGNATURE").map_err(|_| {
+            Error::ConnectionFailed("HYPRLAND_INSTANCE_SIGNATURE is not set".into())
+        })?;
         let runtime_dir = env::var_os("XDG_RUNTIME_DIR")
             .map(PathBuf::from)
             .ok_or_else(|| Error::ConnectionFailed("XDG_RUNTIME_DIR is not set".into()))?;
-        let socket_path = runtime_dir.join("hypr").join(&signature).join(".socket.sock");
+        let socket_path = runtime_dir
+            .join("hypr")
+            .join(&signature)
+            .join(".socket.sock");
         if !socket_path.exists() {
             return Err(Error::ConnectionFailed(format!(
                 "hyprctl socket not found at {}",
@@ -75,10 +79,12 @@ impl HyprlandCompositor {
     /// Send a `dispatch` command and treat anything other than `ok` as failure.
     fn dispatch(&self, cmd: &str) -> Result<()> {
         let reply = self.command(&format!("dispatch {cmd}"))?;
-        if reply.trim() == "ok" {
+        if is_dispatch_ok(&reply) {
             Ok(())
         } else {
-            Err(Error::Protocol(format!("hyprctl dispatch {cmd:?} failed: {reply}")))
+            Err(Error::Protocol(format!(
+                "hyprctl dispatch {cmd:?} failed: {reply}"
+            )))
         }
     }
 
@@ -98,22 +104,7 @@ impl Compositor for HyprlandCompositor {
 
     fn list_windows(&mut self) -> Result<Vec<WindowInfo>> {
         let reply = self.command("j/clients")?;
-        let clients: Vec<HyprClient> = serde_json::from_str(&reply)
-            .map_err(|e| Error::Protocol(format!("parsing hyprctl clients JSON: {e}")))?;
-        Ok(clients
-            .into_iter()
-            .map(|c| WindowInfo {
-                id: WindowId(crate::window::Backing::Hyprland(c.address)),
-                title: c.title,
-                app_id: c.class,
-                geometry: Some(Geometry {
-                    x: c.at.0,
-                    y: c.at.1,
-                    width: c.size.0,
-                    height: c.size.1,
-                }),
-            })
-            .collect())
+        parse_clients(&reply)
     }
 
     fn focus_window(&mut self, id: &WindowId) -> Result<()> {
@@ -136,5 +127,101 @@ impl Compositor for HyprlandCompositor {
         self.dispatch(&format!(
             "resizewindowpixel exact {width} {height},address:{address}"
         ))
+    }
+}
+
+/// Hyprland's IPC replies with the bare text `ok` on a successful dispatch
+/// and an error message otherwise.
+fn is_dispatch_ok(reply: &str) -> bool {
+    reply.trim() == "ok"
+}
+
+/// Parse a `j/clients` reply into [`WindowInfo`]s.
+fn parse_clients(reply: &str) -> Result<Vec<WindowInfo>> {
+    let clients: Vec<HyprClient> = serde_json::from_str(reply)
+        .map_err(|e| Error::Protocol(format!("parsing hyprctl clients JSON: {e}")))?;
+    Ok(clients
+        .into_iter()
+        .map(|c| WindowInfo {
+            id: WindowId(crate::window::Backing::Hyprland(c.address)),
+            title: c.title,
+            app_id: c.class,
+            geometry: Some(Geometry {
+                x: c.at.0,
+                y: c.at.1,
+                width: c.size.0,
+                height: c.size.1,
+            }),
+        })
+        .collect())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn dispatch_ok_accepts_bare_ok_with_whitespace() {
+        assert!(is_dispatch_ok("ok"));
+        assert!(is_dispatch_ok("ok\n"));
+        assert!(is_dispatch_ok("  ok  "));
+    }
+
+    #[test]
+    fn dispatch_ok_rejects_error_messages() {
+        assert!(!is_dispatch_ok("unknown request"));
+        assert!(!is_dispatch_ok(""));
+        assert!(!is_dispatch_ok("Invalid dispatcher"));
+    }
+
+    #[test]
+    fn parses_real_shaped_clients_reply() {
+        // Trimmed down from real `hyprctl clients -j` output -- keeps the
+        // fields this crate reads and drops the many it doesn't, to check
+        // that unrecognized fields don't break deserialization.
+        let reply = r#"[
+            {
+                "address": "0x55c1a2b3c4d5",
+                "mapped": true,
+                "hidden": false,
+                "at": [100, 200],
+                "size": [800, 600],
+                "workspace": {"id": 1, "name": "1"},
+                "floating": false,
+                "monitor": 0,
+                "class": "firefox",
+                "title": "Mozilla Firefox",
+                "pid": 1234,
+                "xwayland": false
+            }
+        ]"#;
+
+        let windows = parse_clients(reply).expect("valid clients JSON should parse");
+        assert_eq!(windows.len(), 1);
+        let w = &windows[0];
+        assert_eq!(w.app_id, "firefox");
+        assert_eq!(w.title, "Mozilla Firefox");
+        let geometry = w.geometry.expect("hyprland always reports geometry");
+        assert_eq!(geometry.x, 100);
+        assert_eq!(geometry.y, 200);
+        assert_eq!(geometry.width, 800);
+        assert_eq!(geometry.height, 600);
+        #[allow(irrefutable_let_patterns)]
+        let crate::window::Backing::Hyprland(address) = &w.id.0
+        else {
+            panic!("expected a Hyprland-backed WindowId, got {:?}", w.id.0);
+        };
+        assert_eq!(address, "0x55c1a2b3c4d5");
+    }
+
+    #[test]
+    fn parses_empty_clients_reply() {
+        let windows = parse_clients("[]").expect("empty array is valid");
+        assert!(windows.is_empty());
+    }
+
+    #[test]
+    fn rejects_malformed_json() {
+        assert!(parse_clients("not json").is_err());
     }
 }

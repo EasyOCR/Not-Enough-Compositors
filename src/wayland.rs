@@ -105,8 +105,8 @@ pub struct WaylandCompositor {
 
 impl WaylandCompositor {
     pub(crate) fn connect() -> Result<Self> {
-        let conn = Connection::connect_to_env()
-            .map_err(|e| Error::ConnectionFailed(e.to_string()))?;
+        let conn =
+            Connection::connect_to_env().map_err(|e| Error::ConnectionFailed(e.to_string()))?;
         let mut queue = conn.new_event_queue::<State>();
         let qh = queue.handle();
         let display = conn.display();
@@ -237,7 +237,8 @@ impl Compositor for WaylandCompositor {
 
     fn focus_window(&mut self, id: &WindowId) -> Result<()> {
         #[allow(irrefutable_let_patterns)]
-        let crate::window::Backing::Wayland(backing) = &id.0 else {
+        let crate::window::Backing::Wayland(backing) = &id.0
+        else {
             return Err(Error::WindowGone);
         };
         match backing {
@@ -262,13 +263,16 @@ impl Compositor for WaylandCompositor {
                 });
             }
         }
-        self.conn.flush().map_err(|e| Error::Protocol(e.to_string()))?;
+        self.conn
+            .flush()
+            .map_err(|e| Error::Protocol(e.to_string()))?;
         Ok(())
     }
 
     fn close_window(&mut self, id: &WindowId) -> Result<()> {
         #[allow(irrefutable_let_patterns)]
-        let crate::window::Backing::Wayland(backing) = &id.0 else {
+        let crate::window::Backing::Wayland(backing) = &id.0
+        else {
             return Err(Error::WindowGone);
         };
         match backing {
@@ -282,7 +286,9 @@ impl Compositor for WaylandCompositor {
                 });
             }
         }
-        self.conn.flush().map_err(|e| Error::Protocol(e.to_string()))?;
+        self.conn
+            .flush()
+            .map_err(|e| Error::Protocol(e.to_string()))?;
         Ok(())
     }
 
@@ -290,7 +296,8 @@ impl Compositor for WaylandCompositor {
         Err(Error::Unsupported {
             backend: Backend::Wayland,
             operation: "move_window",
-            reason: "no Wayland protocol lets one client place another's surface at an exact position",
+            reason:
+                "no Wayland protocol lets one client place another's surface at an exact position",
         })
     }
 
@@ -320,8 +327,7 @@ impl Dispatch<wl_registry::WlRegistry, ()> for State {
         {
             match interface.as_str() {
                 "org_kde_plasma_window_management" if version >= PLASMA_MIN_VERSION => {
-                    state.plasma_manager =
-                        Some(registry.bind(name, version.min(18), qh, ()));
+                    state.plasma_manager = Some(registry.bind(name, version.min(18), qh, ()));
                 }
                 "zwlr_foreign_toplevel_manager_v1" => {
                     state.wlr_manager = Some(registry.bind(name, version.min(3), qh, ()));

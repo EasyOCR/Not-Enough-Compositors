@@ -34,16 +34,70 @@ impl Backend {
     /// precedence over `DISPLAY`, matching how most toolkits choose a
     /// backend when several are present (e.g. an XWayland session).
     pub fn detect() -> Option<Self> {
-        if env::var_os("HYPRLAND_INSTANCE_SIGNATURE").is_some() {
+        Self::detect_from(
+            env::var_os("HYPRLAND_INSTANCE_SIGNATURE").is_some(),
+            env::var_os("NIRI_SOCKET").is_some(),
+            env::var_os("WAYLAND_DISPLAY").is_some(),
+            env::var_os("DISPLAY").is_some(),
+        )
+    }
+
+    /// The actual precedence logic, factored out from environment reads so
+    /// it can be unit tested without mutating process-global env vars
+    /// (which would race across tests run in parallel).
+    fn detect_from(hyprland: bool, niri: bool, wayland: bool, x11: bool) -> Option<Self> {
+        if hyprland {
             Some(Backend::Hyprland)
-        } else if env::var_os("NIRI_SOCKET").is_some() {
+        } else if niri {
             Some(Backend::Niri)
-        } else if env::var_os("WAYLAND_DISPLAY").is_some() {
+        } else if wayland {
             Some(Backend::Wayland)
-        } else if env::var_os("DISPLAY").is_some() {
+        } else if x11 {
             Some(Backend::X11)
         } else {
             None
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn nothing_set_detects_nothing() {
+        assert_eq!(Backend::detect_from(false, false, false, false), None);
+    }
+
+    #[test]
+    fn hyprland_wins_over_everything() {
+        assert_eq!(
+            Backend::detect_from(true, true, true, true),
+            Some(Backend::Hyprland)
+        );
+    }
+
+    #[test]
+    fn niri_wins_over_plain_wayland_and_x11() {
+        assert_eq!(
+            Backend::detect_from(false, true, true, true),
+            Some(Backend::Niri)
+        );
+    }
+
+    #[test]
+    fn wayland_wins_over_x11() {
+        assert_eq!(
+            Backend::detect_from(false, false, true, true),
+            Some(Backend::Wayland)
+        );
+    }
+
+    #[test]
+    fn x11_only_when_nothing_else_present() {
+        assert_eq!(
+            Backend::detect_from(false, false, false, true),
+            Some(Backend::X11)
+        );
     }
 }

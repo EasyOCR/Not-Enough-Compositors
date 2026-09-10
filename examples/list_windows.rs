@@ -8,7 +8,10 @@ fn main() -> Result<(), nec::Error> {
 
     let windows = compositor.list_windows()?;
     for w in &windows {
-        println!("{:?} app_id={:?} title={:?} geometry={:?}", w.id, w.app_id, w.title, w.geometry);
+        println!(
+            "{:?} app_id={:?} title={:?} geometry={:?}",
+            w.id, w.app_id, w.title, w.geometry
+        );
     }
 
     if let Some(first) = windows.first() {

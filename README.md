@@ -1,5 +1,8 @@
 # Not Enough Compositors
 
+[![CI](https://github.com/EasyOCR/not-enough-compositors/actions/workflows/ci.yml/badge.svg)](https://github.com/EasyOCR/not-enough-compositors/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 One API for window control that works the same across X11, Hyprland,
 niri, and the other major Wayland compositors. Not Enough Compositors is
 not a Windows/Linux compatibility layer — it exists so a developer who
@@ -112,6 +115,8 @@ cargo run --example list_windows               # try it against your session
   on them.
 - **COSMIC**: not tested at all; expected to work via the wlr path based
   on its published protocol support, unconfirmed.
+
+See [`CHANGELOG.md`](CHANGELOG.md) for what's landed so far.
 
 ## License
 

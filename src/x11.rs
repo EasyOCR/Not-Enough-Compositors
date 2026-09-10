@@ -6,9 +6,7 @@
 use crate::window::Backing;
 use crate::{Backend, Compositor, Error, Geometry, Result, WindowId, WindowInfo};
 use x11rb::connection::Connection as _;
-use x11rb::protocol::xproto::{
-    AtomEnum, ClientMessageEvent, ConnectionExt, EventMask, Window,
-};
+use x11rb::protocol::xproto::{AtomEnum, ClientMessageEvent, ConnectionExt, EventMask, Window};
 use x11rb::rust_connection::RustConnection;
 
 pub struct X11Compositor {
@@ -28,8 +26,8 @@ struct Atoms {
 
 impl X11Compositor {
     pub(crate) fn connect() -> Result<Self> {
-        let (conn, screen_num) = x11rb::connect(None)
-            .map_err(|e| Error::ConnectionFailed(e.to_string()))?;
+        let (conn, screen_num) =
+            x11rb::connect(None).map_err(|e| Error::ConnectionFailed(e.to_string()))?;
         let root = conn.setup().roots[screen_num].root;
 
         let atoms = Atoms {
@@ -52,7 +50,12 @@ impl X11Compositor {
         }
     }
 
-    fn send_root_client_message(&self, message_type: u32, data: [u32; 5], window: Window) -> Result<()> {
+    fn send_root_client_message(
+        &self,
+        message_type: u32,
+        data: [u32; 5],
+        window: Window,
+    ) -> Result<()> {
         let event = ClientMessageEvent::new(32, window, message_type, data);
         self.conn
             .send_event(
@@ -62,7 +65,9 @@ impl X11Compositor {
                 event,
             )
             .map_err(|e| Error::Protocol(e.to_string()))?;
-        self.conn.flush().map_err(|e| Error::Protocol(e.to_string()))?;
+        self.conn
+            .flush()
+            .map_err(|e| Error::Protocol(e.to_string()))?;
         Ok(())
     }
 }
@@ -96,7 +101,10 @@ impl Compositor for X11Compositor {
             .reply()
             .map_err(|e| Error::Protocol(e.to_string()))?;
 
-        let windows: Vec<Window> = client_list.value32().map(|v| v.collect()).unwrap_or_default();
+        let windows: Vec<Window> = client_list
+            .value32()
+            .map(|v| v.collect())
+            .unwrap_or_default();
 
         let mut infos = Vec::with_capacity(windows.len());
         for window in windows {
@@ -128,31 +136,57 @@ impl Compositor for X11Compositor {
 
     fn move_window(&mut self, id: &WindowId, x: i32, y: i32) -> Result<()> {
         let window = Self::xid(id)?;
-        // _NET_MOVERESIZE_WINDOW: data.l[0] = gravity | (present-flags << 8) | (source << 12)
-        // present-flags: 1=x, 2=y, 4=width, 8=height.
-        const X_PRESENT: u32 = 1;
-        const Y_PRESENT: u32 = 2;
-        const SOURCE_APPLICATION: u32 = 1 << 12;
-        let flags = ((X_PRESENT | Y_PRESENT) << 8) | SOURCE_APPLICATION;
         self.send_root_client_message(
             self.atoms.net_moveresize_window,
-            [flags, x as u32, y as u32, 0, 0],
+            moveresize_data(MoveResizePresent::XY, x as u32, y as u32),
             window,
         )
     }
 
     fn resize_window(&mut self, id: &WindowId, width: u32, height: u32) -> Result<()> {
         let window = Self::xid(id)?;
-        const WIDTH_PRESENT: u32 = 4;
-        const HEIGHT_PRESENT: u32 = 8;
-        const SOURCE_APPLICATION: u32 = 1 << 12;
-        let flags = ((WIDTH_PRESENT | HEIGHT_PRESENT) << 8) | SOURCE_APPLICATION;
         self.send_root_client_message(
             self.atoms.net_moveresize_window,
-            [flags, 0, 0, width, height],
+            moveresize_data(MoveResizePresent::WidthHeight, width, height),
             window,
         )
     }
+}
+
+/// Which pair of `_NET_MOVERESIZE_WINDOW` fields a request is setting.
+enum MoveResizePresent {
+    XY,
+    WidthHeight,
+}
+
+/// Build the `data.l` payload for a `_NET_MOVERESIZE_WINDOW` client message.
+///
+/// Per the EWMH spec, `data.l[0]` is `gravity | (present-flags << 8) | (source << 12)`,
+/// where the present-flags bits are 1=x, 2=y, 4=width, 8=height, and the
+/// remaining fields carry whichever two values `present` selects.
+fn moveresize_data(present: MoveResizePresent, first: u32, second: u32) -> [u32; 5] {
+    const SOURCE_APPLICATION: u32 = 1 << 12;
+    match present {
+        MoveResizePresent::XY => {
+            const X_PRESENT: u32 = 1;
+            const Y_PRESENT: u32 = 2;
+            let flags = ((X_PRESENT | Y_PRESENT) << 8) | SOURCE_APPLICATION;
+            [flags, first, second, 0, 0]
+        }
+        MoveResizePresent::WidthHeight => {
+            const WIDTH_PRESENT: u32 = 4;
+            const HEIGHT_PRESENT: u32 = 8;
+            let flags = ((WIDTH_PRESENT | HEIGHT_PRESENT) << 8) | SOURCE_APPLICATION;
+            [flags, 0, 0, first, second]
+        }
+    }
+}
+
+/// Extract the class (second field) from a raw `WM_CLASS` property value,
+/// which is two NUL-terminated strings back to back: instance, then class.
+fn parse_wm_class(raw: &[u8]) -> String {
+    let raw = String::from_utf8_lossy(raw);
+    raw.split('\u{0}').nth(1).unwrap_or_default().to_string()
 }
 
 impl X11Compositor {
@@ -177,7 +211,14 @@ impl X11Compositor {
         // Fall back to the legacy WM_NAME for apps that don't set the EWMH hint.
         let legacy = self
             .conn
-            .get_property(false, window, AtomEnum::WM_NAME, AtomEnum::STRING, 0, u32::MAX)
+            .get_property(
+                false,
+                window,
+                AtomEnum::WM_NAME,
+                AtomEnum::STRING,
+                0,
+                u32::MAX,
+            )
             .map_err(|e| Error::Protocol(e.to_string()))?
             .reply()
             .map_err(|e| Error::Protocol(e.to_string()))?;
@@ -187,17 +228,18 @@ impl X11Compositor {
     fn window_class(&self, window: Window) -> Result<String> {
         let reply = self
             .conn
-            .get_property(false, window, AtomEnum::WM_CLASS, AtomEnum::STRING, 0, u32::MAX)
+            .get_property(
+                false,
+                window,
+                AtomEnum::WM_CLASS,
+                AtomEnum::STRING,
+                0,
+                u32::MAX,
+            )
             .map_err(|e| Error::Protocol(e.to_string()))?
             .reply()
             .map_err(|e| Error::Protocol(e.to_string()))?;
-        // WM_CLASS is two NUL-terminated strings: instance, then class. We want the class.
-        let raw = String::from_utf8_lossy(&reply.value);
-        Ok(raw
-            .split('\u{0}')
-            .nth(1)
-            .unwrap_or_default()
-            .to_string())
+        Ok(parse_wm_class(&reply.value))
     }
 
     fn window_geometry(&self, window: Window) -> Result<Geometry> {
@@ -213,5 +255,64 @@ impl X11Compositor {
             width: reply.width as u32,
             height: reply.height as u32,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_wm_class_second_field() {
+        assert_eq!(parse_wm_class(b"xterm\0XTerm\0"), "XTerm");
+    }
+
+    #[test]
+    fn wm_class_missing_class_field_is_empty() {
+        assert_eq!(parse_wm_class(b"just-instance\0"), "");
+    }
+
+    #[test]
+    fn wm_class_empty_input_is_empty() {
+        assert_eq!(parse_wm_class(b""), "");
+    }
+
+    #[test]
+    fn moveresize_xy_sets_only_x_and_y_flags() {
+        let data = moveresize_data(MoveResizePresent::XY, 50, 60);
+        let flags = data[0];
+        assert_eq!(flags & 0b1111_00000000, 0b0011_00000000, "x and y bits set");
+        assert_eq!(data[1], 50);
+        assert_eq!(data[2], 60);
+        assert_eq!(data[3], 0);
+        assert_eq!(data[4], 0);
+    }
+
+    #[test]
+    fn moveresize_width_height_sets_only_size_flags() {
+        let data = moveresize_data(MoveResizePresent::WidthHeight, 640, 480);
+        let flags = data[0];
+        assert_eq!(
+            flags & 0b1111_00000000,
+            0b1100_00000000,
+            "width and height bits set"
+        );
+        assert_eq!(data[1], 0);
+        assert_eq!(data[2], 0);
+        assert_eq!(data[3], 640);
+        assert_eq!(data[4], 480);
+    }
+
+    #[test]
+    fn moveresize_always_marks_source_application() {
+        const SOURCE_APPLICATION: u32 = 1 << 12;
+        assert_ne!(
+            moveresize_data(MoveResizePresent::XY, 0, 0)[0] & SOURCE_APPLICATION,
+            0
+        );
+        assert_ne!(
+            moveresize_data(MoveResizePresent::WidthHeight, 0, 0)[0] & SOURCE_APPLICATION,
+            0
+        );
     }
 }
